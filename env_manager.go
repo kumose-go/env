@@ -390,3 +390,61 @@ func ReadEnvTime(dst string) (time.Time, error) {
 	}
 	return t, nil
 }
+
+// SaveAllYaml saves the EnvManager's fragments, sorted flag, and ctime to a YAML file.
+// merged and keySources are not saved since they are runtime-generated.
+func (e *EnvManager) SaveAllYaml(path string) error {
+	type dumpStruct struct {
+		Sorted    bool           `yaml:"sorted"`
+		CTime     string         `yaml:"ctime"`
+		Fragments []*EnvFragment `yaml:"fragments"`
+	}
+
+	d := dumpStruct{
+		Sorted:    e.sorted,
+		CTime:     e.ctime.Format(time.RFC3339),
+		Fragments: e.fragments,
+	}
+
+	data, err := yaml.Marshal(&d)
+	if err != nil {
+		return fmt.Errorf("failed to marshal EnvManager to YAML: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write YAML file %s: %w", path, err)
+	}
+	return nil
+}
+
+// LoadAllYaml loads the EnvManager from a YAML file saved by SaveAllYaml.
+// After loading, it automatically calls SortAndMerge() to rebuild merged and keySources.
+func (e *EnvManager) LoadAllYaml(path string) error {
+	type dumpStruct struct {
+		Sorted    bool           `yaml:"sorted"`
+		CTime     string         `yaml:"ctime"`
+		Fragments []*EnvFragment `yaml:"fragments"`
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read YAML file %s: %w", path, err)
+	}
+
+	var d dumpStruct
+	if err := yaml.Unmarshal(data, &d); err != nil {
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	e.fragments = d.Fragments
+	e.sorted = d.Sorted
+	if d.CTime != "" {
+		if t, err := time.Parse(time.RFC3339, d.CTime); err == nil {
+			e.ctime = t
+		}
+	}
+
+	// rebuild merged and keySources
+	e.SortAndMerge()
+	return nil
+}
