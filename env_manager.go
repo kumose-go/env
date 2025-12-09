@@ -87,6 +87,14 @@ func validateFragment(frag *EnvFragment) error {
 	return nil
 }
 
+func (e *EnvManager) Feed(frag *EnvFragment) error {
+	if err := validateFragment(frag); err != nil {
+		return fmt.Errorf("validation failed for fragment %s: %w", frag.Name, err)
+	}
+	e.fragments = append(e.fragments, frag)
+	return nil
+}
+
 // FeedFile reads a YAML file containing one or more EnvFragments
 // and adds them to the manager, validating priorities.
 func (e *EnvManager) FeedFile(fpath string) error {
