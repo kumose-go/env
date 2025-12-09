@@ -34,6 +34,10 @@ var SystemEnv map[string]int = make(map[string]int)
 
 var InnerComponentEnv map[string]int = make(map[string]int)
 
+const (
+	ENV_CTIME_KEY = "ENV_CTIME"
+)
+
 // EnvFragment represents a single environment fragment loaded from a file.
 type EnvFragment struct {
 	Name     string            `yaml:"name"`
