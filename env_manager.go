@@ -56,13 +56,13 @@ type Script struct {
 // EnvManager manages multiple environment fragments and merged result.
 type EnvManager struct {
 	// fragments maintains the order of fragments as loaded.
-	fragments []*EnvFragment
+	Fragments []*EnvFragment
 	// merged contains the final merged key/value environment.
-	merged map[string]string
+	Merged map[string]string
 	// keySource maps environment keys to the fragment and file that defined them.
-	keySources map[string][]string
+	KeySources map[string][]string
 	sorted     bool
-	ctime      time.Time
+	Ctime      time.Time
 }
 
 // validateFragment checks fragment priority according to its type.
@@ -91,7 +91,7 @@ func (e *EnvManager) Feed(frag *EnvFragment) error {
 	if err := validateFragment(frag); err != nil {
 		return fmt.Errorf("validation failed for fragment %s: %w", frag.Name, err)
 	}
-	e.fragments = append(e.fragments, frag)
+	e.Fragments = append(e.Fragments, frag)
 	return nil
 }
 
@@ -120,7 +120,7 @@ func (e *EnvManager) FeedFile(fpath string) error {
 			return fmt.Errorf("validation failed for fragment %s in %s: %w", frag.Name, fpath, err)
 		}
 
-		e.fragments = append(e.fragments, &frag)
+		e.Fragments = append(e.Fragments, &frag)
 	}
 
 	return nil
@@ -152,35 +152,35 @@ func (e *EnvManager) FeedDir(dir string) error {
 }
 
 func (e *EnvManager) SortAndMerge() {
-	if e.merged == nil {
-		e.merged = make(map[string]string)
+	if e.Merged == nil {
+		e.Merged = make(map[string]string)
 	}
 	// key -> slice of source fragment names
-	e.keySources = make(map[string][]string)
+	e.KeySources = make(map[string][]string)
 
 	// Sort fragments by Priority ascending
-	sort.SliceStable(e.fragments, func(i, j int) bool {
-		return e.fragments[i].Priority < e.fragments[j].Priority
+	sort.SliceStable(e.Fragments, func(i, j int) bool {
+		return e.Fragments[i].Priority < e.Fragments[j].Priority
 	})
 
 	// Merge
-	for _, frag := range e.fragments {
+	for _, frag := range e.Fragments {
 		for k, v := range frag.Env {
-			e.merged[k] = v
-			e.keySources[k] = append(e.keySources[k], frag.Name)
+			e.Merged[k] = v
+			e.KeySources[k] = append(e.KeySources[k], frag.Name)
 		}
 	}
 
 	// Optional: attach sources info to fragments for debugging / search
-	for _, frag := range e.fragments {
+	for _, frag := range e.Fragments {
 		for k := range frag.Env {
 			// You could keep a map in EnvFragment: map[key] -> source frag name
 			// or just rely on keySources globally
-			_ = e.keySources[k] // for potential future search/debug
+			_ = e.KeySources[k] // for potential future search/debug
 		}
 	}
 	e.sorted = true
-	e.ctime = time.Now()
+	e.Ctime = time.Now()
 }
 
 func (e *EnvManager) BuildBash(dst string) error {
@@ -192,9 +192,9 @@ func (e *EnvManager) BuildBash(dst string) error {
 		return err
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "# Env generated at %s\n", e.ctime.Format(time.RFC3339))
-	fmt.Fprintf(f, "export ENV_CTIME=\"%s\"\n\n", e.ctime.Format(time.RFC3339))
-	for _, frag := range e.fragments {
+	fmt.Fprintf(f, "# Env generated at %s\n", e.Ctime.Format(time.RFC3339))
+	fmt.Fprintf(f, "export ENV_CTIME=\"%s\"\n\n", e.Ctime.Format(time.RFC3339))
+	for _, frag := range e.Fragments {
 		fmt.Fprintf(f, "# --- Fragment: %s ---\n", frag.Name)
 		for k, v := range frag.Env {
 			fmt.Fprintf(f, "export %s=\"%s\"\n", k, v)
@@ -221,9 +221,9 @@ func (e *EnvManager) BuildZsh(dst string) error {
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "# Env generated at %s\n", e.ctime.Format(time.RFC3339))
-	fmt.Fprintf(f, "export ENV_CTIME=\"%s\"\n", e.ctime.Format(time.RFC3339))
-	for _, frag := range e.fragments {
+	fmt.Fprintf(f, "# Env generated at %s\n", e.Ctime.Format(time.RFC3339))
+	fmt.Fprintf(f, "export ENV_CTIME=\"%s\"\n", e.Ctime.Format(time.RFC3339))
+	for _, frag := range e.Fragments {
 		// Write fragment header
 		if frag.Name != "" {
 			fmt.Fprintf(f, "# --- Fragment: %s ---\n", frag.Name)
@@ -259,8 +259,8 @@ func (e *EnvManager) BuildPsh(dst string) error {
 		return err
 	}
 	defer f.Close()
-	fmt.Fprintf(f, `$Env:ENV_CTIME = "%s"`+"\n", e.ctime.Format(time.RFC3339))
-	for _, frag := range e.fragments {
+	fmt.Fprintf(f, `$Env:ENV_CTIME = "%s"`+"\n", e.Ctime.Format(time.RFC3339))
+	for _, frag := range e.Fragments {
 		// Write fragment header
 		if frag.Name != "" {
 			fmt.Fprintf(f, "# --- Fragment: %s ---\n", frag.Name)
@@ -307,7 +307,7 @@ func (e *EnvManager) Search(pattern string) ([]SearchResult, error) {
 	}
 
 	var results []SearchResult
-	for _, frag := range e.fragments {
+	for _, frag := range e.Fragments {
 		for k, v := range frag.Env {
 			if re.MatchString(k) || re.MatchString(v) {
 				results = append(results, SearchResult{
@@ -386,7 +386,7 @@ func (e *EnvManager) WriteMeta(dst string) error {
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(e.ctime.Format(time.RFC3339))
+	_, err = f.WriteString(e.Ctime.Format(time.RFC3339))
 	return err
 }
 
@@ -406,6 +406,9 @@ func ReadEnvTime(dst string) (time.Time, error) {
 // SaveAllYaml saves the EnvManager's fragments, sorted flag, and ctime to a YAML file.
 // merged and keySources are not saved since they are runtime-generated.
 func (e *EnvManager) SaveAllYaml(path string) error {
+	if !e.sorted {
+		return fmt.Errorf("not sorte yet")
+	}
 	type dumpStruct struct {
 		Sorted    bool           `yaml:"sorted"`
 		CTime     string         `yaml:"ctime"`
@@ -414,8 +417,8 @@ func (e *EnvManager) SaveAllYaml(path string) error {
 
 	d := dumpStruct{
 		Sorted:    e.sorted,
-		CTime:     e.ctime.Format(time.RFC3339),
-		Fragments: e.fragments,
+		CTime:     e.Ctime.Format(time.RFC3339),
+		Fragments: e.Fragments,
 	}
 
 	data, err := yaml.Marshal(&d)
@@ -448,11 +451,11 @@ func (e *EnvManager) LoadAllYaml(path string) error {
 		return fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
 
-	e.fragments = d.Fragments
+	e.Fragments = d.Fragments
 	e.sorted = d.Sorted
 	if d.CTime != "" {
 		if t, err := time.Parse(time.RFC3339, d.CTime); err == nil {
-			e.ctime = t
+			e.Ctime = t
 		}
 	}
 
