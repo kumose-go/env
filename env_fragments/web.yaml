@@ -1,0 +1,12 @@
+# ./env_fragments/web.yaml
+name: web_service
+priority: 100
+env:
+  SERVICE_PORT: "8080"
+  SERVICE_HOST: "0.0.0.0"
+script:
+  - sh: bash
+    data: |
+      if [ -z "$SERVICE_URL" ]; then
+        export SERVICE_URL="http://$SERVICE_HOST:$SERVICE_PORT"
+      fi
